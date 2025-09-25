@@ -1,0 +1,7 @@
+Django==4.2
+djangorestframework==3.14.0
+psycopg2-binary==2.9.6
+django-cors-headers==3.14.0
+djangorestframework-simplejwt==5.2.2
+pytest==7.2.2
+pytest-django==4.5.2
