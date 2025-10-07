@@ -1,37 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { fetchWarehouses } from '../services/api';
+import React, { useState } from 'react';
+import {
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Box,
+} from '@mui/material';
 
-const WarehouseSelector: React.FC<{ onSelect: (warehouseId: string) => void }> = ({ onSelect }) => {
-    const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
-    const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null);
+interface Warehouse {
+  id: number;
+  name: string;
+}
 
-    useEffect(() => {
-        const loadWarehouses = async () => {
-            const data = await fetchWarehouses();
-            setWarehouses(data);
-        };
+interface WarehouseSelectorProps {
+  warehouses: Warehouse[];
+  onSelect: (warehouseId: number) => void;
+}
 
-        loadWarehouses();
-    }, []);
+const WarehouseSelector: React.FC<WarehouseSelectorProps> = ({ warehouses, onSelect }) => {
+    const [selectedWarehouse, setSelectedWarehouse] = useState<number | null>(null);
 
-    const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        const warehouseId = event.target.value;
+    const handleChange = (event: any) => {
+        const warehouseId = Number(event.target.value);
         setSelectedWarehouse(warehouseId);
         onSelect(warehouseId);
     };
 
     return (
-        <div>
-            <label htmlFor="warehouse-selector">Select Warehouse:</label>
-            <select id="warehouse-selector" value={selectedWarehouse || ''} onChange={handleChange}>
-                <option value="" disabled>Select a warehouse</option>
-                {warehouses.map(warehouse => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name}
-                    </option>
-                ))}
-            </select>
-        </div>
+        <Box mb={2}>
+            <FormControl fullWidth>
+                <InputLabel id="warehouse-select-label">Select Warehouse</InputLabel>
+                <Select
+                    labelId="warehouse-select-label"
+                    id="warehouse-select"
+                    value={selectedWarehouse || ''}
+                    label="Select Warehouse"
+                    onChange={handleChange}
+                >
+                    <MenuItem value="" disabled>
+                        Select a warehouse
+                    </MenuItem>
+                    {warehouses.map((warehouse) => (
+                        <MenuItem key={warehouse.id} value={warehouse.id}>
+                            {warehouse.name}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+        </Box>
     );
 };
 

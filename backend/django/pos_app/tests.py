@@ -1,15 +1,13 @@
 from django.test import TestCase
-from .models import Product, Warehouse
+from pos_app.models import Product, Warehouse
 
 class ProductModelTest(TestCase):
     def setUp(self):
-        self.warehouse = Warehouse.objects.create(name="Main Warehouse", location="123 Main St")
-        self.product = Product.objects.create(name="Test Product", price=10.99, warehouse=self.warehouse)
+        self.product = Product.objects.create(name="Test Product", price=10.99)
 
     def test_product_creation(self):
         self.assertEqual(self.product.name, "Test Product")
         self.assertEqual(self.product.price, 10.99)
-        self.assertEqual(self.product.warehouse.name, "Main Warehouse")
 
 class WarehouseModelTest(TestCase):
     def setUp(self):

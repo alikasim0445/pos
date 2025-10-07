@@ -23,9 +23,14 @@ export interface Sale {
 
 export interface User {
   id: number;
-  username: string;
+  username?: string;
   email: string;
-  role: 'admin' | 'staff';
+  first_name: string;
+  last_name: string;
+  date_joined: string;
+  profile?: {
+    role: string;
+  };
 }
 
 export interface AuthContextType {
