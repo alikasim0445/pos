@@ -98,6 +98,10 @@ export const userAPI = {
   getUserById: (id: number) => apiClient.get(`/users/${id}/`),
   updateUser: (id: number, userData: any) => apiClient.put(`/users/${id}/`, userData),
   deleteUser: (id: number) => apiClient.delete(`/users/${id}/`),
+  
+  // Transfer API calls
+  getAllTransfers: () => apiClient.get('/transfers/'),
+  updateTransfer: (id: number, transferData: any) => apiClient.put(`/transfers/${id}/`, transferData),
 };
 
 // Product API calls

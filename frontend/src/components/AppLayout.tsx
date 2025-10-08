@@ -23,6 +23,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import StoreIcon from '@mui/icons-material/Store';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { logout } from '../store/authSlice';
@@ -59,6 +60,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { text: 'Purchase Orders', icon: <AssignmentIcon />, path: '/purchase-orders' },
   ];
 
+  const storeManagerMenuItems = [
+    { text: 'Store Operations', icon: <StoreIcon />, path: '/store-manager' },
+  ];
+
   const superAdminMenuItems = [
     { text: 'User Management', icon: <AccountCircleIcon />, path: '/users' },
   ];
@@ -81,6 +86,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </ListItem>
         ))}
       </List>
+      {(user?.profile?.role === 'store_manager' || user?.profile?.role === 'admin') && (
+        <>
+          <Divider />
+          <List>
+            <ListItem key="store-operations" disablePadding>
+              <ListItemButton onClick={() => navigate('/store-manager')}>
+                <ListItemIcon><StoreIcon /></ListItemIcon>
+                <ListItemText primary="Store Operations" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </>
+      )}
       {user?.profile?.role === 'super_admin' && (
         <>
           <Divider />

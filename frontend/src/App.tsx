@@ -12,6 +12,7 @@ import Promotions from './pages/Promotions';
 import PurchaseOrders from './pages/PurchaseOrders';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
+import StoreManagerDashboard from './pages/StoreManagerDashboard';
 import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
@@ -19,6 +20,7 @@ import ResetPassword from './components/ResetPassword';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
+import StoreManagerRoute from './components/StoreManagerRoute';
 
 const App: React.FC = () => {
   const dispatch = useDispatch();
@@ -136,6 +138,16 @@ const App: React.FC = () => {
                 <Users />
               </AppLayout>
             
+          } 
+        />
+        <Route 
+          path="/store-manager" 
+          element={
+            <StoreManagerRoute>
+              <AppLayout>
+                <StoreManagerDashboard />
+              </AppLayout>
+            </StoreManagerRoute>
           } 
         />
         

@@ -142,94 +142,112 @@ const Profile: React.FC = () => {
 
   if (authLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+      <div className="flex justify-center items-center h-52">
         <CircularProgress />
-      </Box>
+      </div>
     );
   }
 
   if (!user) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+      <div className="flex justify-center items-center h-52">
         <Typography variant="h6">Please log in to view profile</Typography>
-      </Box>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">User Profile</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+        <p className="mt-2 text-gray-600">Manage your account information and preferences</p>
+      </div>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" className="mb-4">
           {error}
         </Alert>
       )}
       
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" className="mb-4">
           Profile updated successfully!
         </Alert>
       )}
       
-      <Grid container spacing={3}>
+      <Grid container spacing={6}>
+        {/* Profile Sidebar */}
         <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
+          <Card className="shadow-lg">
+            <CardContent className="text-center">
+              {/* Profile Avatar */}
+              <div className="flex justify-center mb-6">
                 <Avatar 
-                  sx={{ width: 100, height: 100, fontSize: 30, mb: 2, bgcolor: 'primary.main' }}
+                  sx={{ width: 120, height: 120, fontSize: 40, bgcolor: 'primary.main' }}
+                  className="ring-4 ring-white shadow-lg"
                 >
                   {(user.first_name?.charAt(0) || user.last_name?.charAt(0) || user.email?.charAt(0) || 'U').toUpperCase()}
                 </Avatar>
-                <Typography variant="h6" align="center">
-                  {user.first_name} {user.last_name}
-                </Typography>
-                <Typography color="textSecondary" variant="body2" align="center">
-                  {user.email}
-                </Typography>
-                {user.profile?.role && (
-                  <Chip 
-                    label={user.profile.role.replace('_', ' ').toUpperCase()} 
-                    color="primary" 
-                    sx={{ mt: 1 }} 
-                  />
-                )}
-              </Box>
+              </div>
               
-              <Divider sx={{ my: 2 }} />
-              
-              <Typography variant="subtitle1" gutterBottom>
-                Account Information
+              {/* User Info */}
+              <Typography variant="h6" className="font-semibold text-lg">
+                {user.first_name} {user.last_name}
               </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Username:</strong> {user.username}
+              <Typography color="textSecondary" className="text-gray-600 mb-2">
+                {user.email}
               </Typography>
-              <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Member since:</strong> {user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Status:</strong> 
+              {user.profile?.role && (
                 <Chip 
-                  label={user.is_active ? "Active" : "Inactive"} 
-                  color={user.is_active ? "success" : "error"} 
-                  size="small" 
-                  sx={{ ml: 1 }}
+                  label={user.profile.role.replace('_', ' ').toUpperCase()} 
+                  color="primary" 
+                  className="mb-4"
+                  sx={{ fontWeight: 600, textTransform: 'capitalize' }}
                 />
-              </Typography>
+              )}
+              
+              <Divider className="my-4" />
+              
+              {/* Account Information */}
+              <div className="text-left">
+                <Typography variant="subtitle1" className="font-medium mb-2">
+                  Account Information
+                </Typography>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Username:</span>
+                    <span className="font-medium">{user.username}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Member since:</span>
+                    <span className="font-medium">
+                      {user.date_joined ? new Date(user.date_joined).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <Chip 
+                      label={user.is_active ? "Active" : "Inactive"} 
+                      color={user.is_active ? "success" : "error"} 
+                      size="small"
+                    />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
           
           {/* Security Card */}
-          <Card sx={{ mt: 3 }}>
+          <Card className="shadow-lg mt-6">
             <CardContent>
-              <Typography variant="h6" gutterBottom>
+              <Typography variant="h6" className="font-semibold mb-4">
                 Security
               </Typography>
               <Button 
                 variant="outlined" 
                 fullWidth
                 onClick={() => alert('Change password functionality would be implemented here')}
+                className="mt-2"
               >
                 Change Password
               </Button>
@@ -237,30 +255,33 @@ const Profile: React.FC = () => {
           </Card>
         </Grid>
         
+        {/* Profile Main Content */}
         <Grid item xs={12} md={8}>
-          <Card>
+          <Card className="shadow-lg">
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h6">Profile Information</Typography>
-                <Box>
+              <div className="flex justify-between items-center mb-6">
+                <Typography variant="h6" className="font-semibold text-lg">
+                  Personal Information
+                </Typography>
+                <div>
                   {isEditing ? (
-                    <>
+                    <div className="flex space-x-2">
                       <IconButton 
                         onClick={handleSaveClick} 
                         color="primary" 
                         disabled={loading}
                         title="Save"
                       >
-                        <SaveIcon />
+                        {loading ? <CircularProgress size={20} /> : <SaveIcon />}
                       </IconButton>
                       <IconButton 
                         onClick={handleCancelClick} 
-                        color="secondary" 
+                        color="error" 
                         title="Cancel"
                       >
                         <CancelIcon />
                       </IconButton>
-                    </>
+                    </div>
                   ) : (
                     <IconButton 
                       onClick={handleEditClick} 
@@ -270,10 +291,10 @@ const Profile: React.FC = () => {
                       <EditIcon />
                     </IconButton>
                   )}
-                </Box>
-              </Box>
+                </div>
+              </div>
               
-              <Grid container spacing={2}>
+              <Grid container spacing={4}>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -282,8 +303,10 @@ const Profile: React.FC = () => {
                     value={formData.first_name}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    variant={isEditing ? "outlined" : "standard"}
+                    variant={isEditing ? "outlined" : "filled"}
                     margin="normal"
+                    InputLabelProps={isEditing ? undefined : { shrink: true }}
+                    className={isEditing ? "bg-white" : "bg-gray-50"}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -294,21 +317,25 @@ const Profile: React.FC = () => {
                     value={formData.last_name}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    variant={isEditing ? "outlined" : "standard"}
+                    variant={isEditing ? "outlined" : "filled"}
                     margin="normal"
+                    InputLabelProps={isEditing ? undefined : { shrink: true }}
+                    className={isEditing ? "bg-white" : "bg-gray-50"}
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
-                    label="Email"
+                    label="Email Address"
                     name="email"
                     type="email"
                     value={formData.email}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    variant={isEditing ? "outlined" : "standard"}
+                    variant={isEditing ? "outlined" : "filled"}
                     margin="normal"
+                    InputLabelProps={isEditing ? undefined : { shrink: true }}
+                    className={isEditing ? "bg-white" : "bg-gray-50"}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -319,40 +346,48 @@ const Profile: React.FC = () => {
                     value={formData.username}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    variant={isEditing ? "outlined" : "standard"}
+                    variant={isEditing ? "outlined" : "filled"}
                     margin="normal"
+                    InputLabelProps={isEditing ? undefined : { shrink: true }}
+                    className={isEditing ? "bg-white" : "bg-gray-50"}
                   />
                 </Grid>
               </Grid>
               
               {user.profile?.role && (
                 <>
-                  <Divider sx={{ my: 3 }} />
-                  <Typography variant="h6" gutterBottom>
+                  <Divider className="my-6" />
+                  <Typography variant="h6" className="font-semibold mb-4">
                     Role Information
                   </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <Typography variant="body2">
-                        <strong>Role:</strong> {user.profile.role.replace('_', ' ').toUpperCase()}
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center mb-3">
+                      <div className="mr-3 bg-blue-100 p-2 rounded-full">
+                        <Chip 
+                          label={user.profile.role.replace('_', ' ').toUpperCase()} 
+                          color="primary"
+                          size="small"
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </div>
+                      <Typography variant="subtitle1" className="font-semibold">
+                        {user.profile.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="body2">
-                        {user.profile.role === 'super_admin' && "As a Super Admin, you have full system access and can manage all users and settings."}
-                        {user.profile.role === 'admin' && "As an Admin, you can manage products, warehouses, pricing, and view reports."}
-                        {user.profile.role === 'warehouse_manager' && "As a Warehouse Manager, you can manage received goods, stock adjustments, and transfers."}
-                        {user.profile.role === 'store_manager' && "As a Store Manager, you can view store-level reports and approve transfers."}
-                        {user.profile.role === 'cashier' && "As a Cashier, you can process sales, returns, and handle payments."}
-                        {user.profile.role === 'accountant' && "As an Accountant, you can view financial reports and export data."}
-                      </Typography>
-                    </Grid>
-                  </Grid>
+                    </div>
+                    <Typography variant="body2" className="text-gray-700">
+                      {user.profile.role === 'super_admin' && "As a Super Admin, you have full system access and can manage all users and settings."}
+                      {user.profile.role === 'admin' && "As an Admin, you can manage products, warehouses, pricing, and view reports."}
+                      {user.profile.role === 'warehouse_manager' && "As a Warehouse Manager, you can manage received goods, stock adjustments, and transfers."}
+                      {user.profile.role === 'store_manager' && "As a Store Manager, you can view store-level reports and approve transfers."}
+                      {user.profile.role === 'cashier' && "As a Cashier, you can process sales, returns, and handle payments."}
+                      {user.profile.role === 'accountant' && "As an Accountant, you can view financial reports and export data."}
+                    </Typography>
+                  </div>
                 </>
               )}
               
               {isEditing && (
-                <Box mt={3}>
+                <div className="mt-6 pt-4 border-t border-gray-200">
                   <FormControlLabel
                     control={
                       <Switch
@@ -365,60 +400,65 @@ const Profile: React.FC = () => {
                     label="Account Active"
                     title="Account status can only be changed by administrators"
                   />
-                  <Typography variant="caption" color="textSecondary">
+                  <Typography variant="caption" color="textSecondary" className="block mt-1">
                     Note: Account status can only be changed by administrators
                   </Typography>
-                </Box>
+                </div>
               )}
             </CardContent>
           </Card>
           
           {/* Super Admin - All Users View */}
           {user.profile?.role === 'super_admin' && (
-            <Card sx={{ mt: 3 }}>
+            <Card className="shadow-lg mt-6">
               <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                  <Typography variant="h6">All Users</Typography>
+                <div className="flex justify-between items-center mb-6">
+                  <Typography variant="h6" className="font-semibold text-lg">
+                    All Users
+                  </Typography>
                   <Button 
                     variant="outlined" 
                     onClick={toggleShowAllUsers}
+                    className="capitalize"
                   >
                     {showAllUsers ? 'Hide Users' : 'Show All Users'}
                   </Button>
-                </Box>
+                </div>
                 
                 {showAllUsers && (
                   <div>
                     {usersLoading ? (
-                      <Box display="flex" justifyContent="center" my={3}>
+                      <div className="flex justify-center my-6">
                         <CircularProgress />
-                      </Box>
+                      </div>
                     ) : (
-                      <Grid container spacing={2}>
+                      <Grid container spacing={3}>
                         {allUsers.map((u) => (
                           <Grid item xs={12} sm={6} md={4} key={u.id}>
-                            <Card variant="outlined" sx={{ p: 2 }}>
-                              <Box display="flex" alignItems="center">
+                            <Card variant="outlined" className="p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-center">
                                 <Avatar 
-                                  sx={{ width: 40, height: 40, fontSize: 16, bgcolor: 'secondary.main', mr: 2 }}
+                                  sx={{ width: 48, height: 48, fontSize: 18, bgcolor: 'secondary.main', mr: 3 }}
                                 >
                                   {(u.first_name?.charAt(0) || u.last_name?.charAt(0) || u.email?.charAt(0) || 'U').toUpperCase()}
                                 </Avatar>
-                                <Box>
-                                  <Typography variant="subtitle2">
+                                <div className="flex-1 min-w-0">
+                                  <Typography variant="subtitle2" className="font-medium truncate">
                                     {u.first_name} {u.last_name}
                                   </Typography>
-                                  <Typography variant="body2" color="textSecondary">
+                                  <Typography variant="body2" color="textSecondary" className="truncate">
                                     {u.username}
                                   </Typography>
-                                  <Chip 
-                                    label={u.profile?.role?.replace('_', ' ').toUpperCase() || 'N/A'} 
-                                    size="small"
-                                    color={u.profile?.role === 'super_admin' ? 'error' : 'default'}
-                                    sx={{ mt: 1 }}
-                                  />
-                                </Box>
-                              </Box>
+                                  <div className="mt-2">
+                                    <Chip 
+                                      label={u.profile?.role?.replace('_', ' ').toUpperCase() || 'N/A'} 
+                                      size="small"
+                                      color={u.profile?.role === 'super_admin' ? 'error' : 'default'}
+                                      className="capitalize"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             </Card>
                           </Grid>
                         ))}
@@ -434,24 +474,15 @@ const Profile: React.FC = () => {
       
       {/* Action Buttons for Mobile */}
       {isEditing && (
-        <Box 
-          display={{ xs: 'block', md: 'none' }} 
-          sx={{ 
-            position: 'fixed', 
-            bottom: 0, 
-            left: 0, 
-            right: 0, 
-            bgcolor: 'background.paper', 
-            p: 2, 
-            borderTop: '1px solid #e0e0e0' 
-          }}
+        <div 
+          className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 md:hidden"
         >
-          <Grid container spacing={1}>
+          <Grid container spacing={2}>
             <Grid item xs={6}>
               <Button 
                 fullWidth 
                 variant="outlined" 
-                color="secondary" 
+                color="error" 
                 onClick={handleCancelClick}
                 startIcon={<CancelIcon />}
               >
@@ -465,13 +496,13 @@ const Profile: React.FC = () => {
                 color="primary" 
                 onClick={handleSaveClick}
                 disabled={loading}
-                startIcon={<SaveIcon />}
+                startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
               >
                 {loading ? 'Saving...' : 'Save'}
               </Button>
             </Grid>
           </Grid>
-        </Box>
+        </div>
       )}
     </div>
   );

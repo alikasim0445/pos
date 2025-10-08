@@ -8,6 +8,7 @@ from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse
+from django.utils import timezone
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
@@ -381,6 +382,36 @@ class TransferDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Transfer.objects.all()
     serializer_class = TransferSerializer
     permission_classes = [IsAuthenticated]
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Override the update method to handle transfer approval specifically.
+        Store managers can approve transfers.
+        """
+        instance = self.get_object()
+        
+        # Check if this is an approval request
+        if 'status' in request.data and request.data['status'] == 'approved':
+            # Only allow store managers, admins, and super admins to approve transfers
+            if not (hasattr(request.user, 'userprofile') and 
+                    request.user.userprofile.role in ['store_manager', 'admin', 'super_admin']):
+                return Response(
+                    {'error': 'You do not have permission to approve transfers.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Update the status and approved_by fields
+            instance.status = 'approved'
+            instance.approved_by = request.user
+            instance.approved_at = timezone.now()
+            instance.save()
+            
+            # Return the updated transfer
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        
+        # For other updates, allow users with proper permissions
+        return super().update(request, *args, **kwargs)
 
 
 # Promotion/Discount Views
@@ -553,6 +584,20 @@ def low_stock_alerts(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def sales_report(request):
+    # Check if the user has permission to view reports
+    if hasattr(request.user, 'userprofile'):
+        user_role = request.user.userprofile.role
+        # Store managers, admins, and super admins can view reports
+        if user_role not in ['store_manager', 'admin', 'super_admin', 'accountant']:
+            return Response(
+                {'error': 'You do not have permission to view this report.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    else:
+        return Response(
+            {'error': 'User profile not found.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
     """
     Generate sales report by period, store, warehouse, or SKU
     """
@@ -623,6 +668,21 @@ def sales_report(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def inventory_report(request):
+    # Check if the user has permission to view reports
+    if hasattr(request.user, 'userprofile'):
+        user_role = request.user.userprofile.role
+        # Store managers, admins, and super admins can view reports
+        if user_role not in ['store_manager', 'admin', 'super_admin', 'warehouse_manager', 'accountant']:
+            return Response(
+                {'error': 'You do not have permission to view this report.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    else:
+        return Response(
+            {'error': 'User profile not found.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
     """
     Generate inventory report with stock levels and aging
     """
@@ -678,6 +738,21 @@ def inventory_report(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profitability_report(request):
+    # Check if the user has permission to view reports
+    if hasattr(request.user, 'userprofile'):
+        user_role = request.user.userprofile.role
+        # Store managers, admins, and super admins can view reports
+        if user_role not in ['store_manager', 'admin', 'super_admin', 'accountant']:
+            return Response(
+                {'error': 'You do not have permission to view this report.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    else:
+        return Response(
+            {'error': 'User profile not found.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
     """
     Generate profitability report (revenue, COGS)
     """
@@ -748,6 +823,21 @@ def profitability_report(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def transfer_report(request):
+    # Check if the user has permission to view reports
+    if hasattr(request.user, 'userprofile'):
+        user_role = request.user.userprofile.role
+        # Store managers, admins, and super admins can view reports
+        if user_role not in ['store_manager', 'admin', 'super_admin', 'warehouse_manager']:
+            return Response(
+                {'error': 'You do not have permission to view this report.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+    else:
+        return Response(
+            {'error': 'User profile not found.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
     """
     Generate transfer history report
     """
@@ -928,6 +1018,19 @@ class IsSuperAdmin(BasePermission):
         )
 
 
+class IsStoreManager(BasePermission):
+    """
+    Custom permission to allow store managers to access specific views.
+    """
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            hasattr(request.user, 'userprofile') and 
+            request.user.userprofile.role in ['store_manager', 'admin', 'super_admin']
+        )
+
+
 class SuperAdminUserManagementView(generics.ListCreateAPIView):
     """
     Super Admin specific view for user management with enhanced features:
@@ -1008,6 +1111,18 @@ class SuperAdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
                     {'error': 'Cannot delete the last super admin user.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+        
+        # Handle protected foreign key constraints by reassigning related objects to the admin user
+        admin_user = request.user  # The admin performing the deletion
+        
+        # Handle transfers where user is requested_by
+        Transfer.objects.filter(requested_by=instance).update(requested_by=admin_user)
+        
+        # Handle sales where user is cashier
+        Sale.objects.filter(cashier=instance).update(cashier=admin_user)
+        
+        # Handle goods received notes where user is received_by
+        GoodsReceivedNote.objects.filter(received_by=instance).update(received_by=admin_user)
         
         return super().destroy(request, *args, **kwargs)
 

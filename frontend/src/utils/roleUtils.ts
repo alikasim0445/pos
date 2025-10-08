@@ -57,7 +57,8 @@ export const hasPermission = (user: User | null, permission: string): boolean =>
     ],
     'store_manager': [
       'view_sales', 'process_sales', 'view_inventory', 
-      'manage_customers', 'process_returns', 'view_reports'
+      'manage_customers', 'process_returns', 'view_reports',
+      'approve_transfers', 'view_store_reports'
     ],
     'warehouse_manager': [
       'view_inventory', 'manage_inventory', 'process_transfers',
