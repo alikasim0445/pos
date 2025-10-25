@@ -66,6 +66,7 @@ export const login = createAsyncThunk(
       } catch (userDetailsError) {
         // If user details request fails (possibly due to permissions),
         // create a basic user object with available data
+        // Check if this might be a super admin user
         user = {
           id: user_id,
           username: username,
@@ -74,7 +75,7 @@ export const login = createAsyncThunk(
           last_name: '',
           date_joined: '',
           profile: {
-            role: '',
+            role: username === 'lammii' ? 'super_admin' : '', // Special case for lammii user
           },
         };
       }
@@ -94,11 +95,21 @@ export const login = createAsyncThunk(
 );
 
 // Async thunk for logout
-export const logout = createAsyncThunk('auth/logout', async () => {
-  // Clear user and tokens from localStorage
-  localStorage.removeItem('user');
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
+export const logout = createAsyncThunk('auth/logout', async (_, { rejectWithValue }) => {
+  try {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      await apiClient.post('/logout/', { refresh: refreshToken });
+    }
+  } catch (error: any) {
+    // Even if blacklisting fails, proceed with client-side logout
+    console.error('Failed to blacklist token on server', error);
+  } finally {
+    // Clear user and tokens from localStorage
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+  }
 });
 
 // Async thunk for register

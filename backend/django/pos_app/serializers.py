@@ -2,10 +2,10 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.db import transaction
 from .models import (
-    UserProfile, Category, Product, ProductVariant, Warehouse, 
-    Inventory, Customer, Sale, SaleLine, Payment, 
+    UserProfile, Category, Product, ProductVariant, Warehouse, Location, Bin,
+    Inventory, Customer, Sale, SaleLine, Payment, Webhook, WebhookLog, PaymentToken, PaymentGatewayConfig, EcommercePlatform, EcommerceSyncLog, 
     Transfer, TransferLine, Return, ReturnLine, Promotion, Coupon, 
-    PurchaseOrder, PurchaseOrderLine, GoodsReceivedNote, GoodsReceivedNoteLine, AuditLog
+    PurchaseOrder, PurchaseOrderLine, GoodsReceivedNote, GoodsReceivedNoteLine, AuditLog, Reservation, ReservationLine
 )
 
 
@@ -18,9 +18,14 @@ class CustomValidationError(serializers.ValidationError):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField(read_only=True)
+    
     class Meta:
         model = UserProfile
         fields = '__all__'
+        
+    def get_permissions(self, obj):
+        return list(obj.get_all_permissions())  # Return the user's permissions as a list
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -82,12 +87,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(read_only=True)
-    role = serializers.CharField(source='userprofile.role', read_only=True)
+    profile = UserProfileSerializer(source='userprofile', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile', 'role', 'date_joined', 'is_active']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile', 'date_joined', 'is_active']
         read_only_fields = ['id', 'date_joined']
         extra_kwargs = {'password': {'write_only': True}}
     
@@ -180,6 +184,11 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = '__all__'
     
+    def validate_name(self, value):
+        if not value.strip():
+            raise CustomValidationError("Product name cannot be empty.")
+        return value
+
     def validate_sku(self, value):
         if not value.strip():
             raise CustomValidationError("SKU cannot be empty.")
@@ -221,9 +230,46 @@ class WarehouseSerializer(serializers.ModelSerializer):
         return value
 
 
+class LocationSerializer(serializers.ModelSerializer):
+    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True)
+    
+    class Meta:
+        model = Location
+        fields = '__all__'
+    
+    def validate(self, attrs):
+        # Check for circular reference if updating parent location
+        parent_location = attrs.get('parent_location')
+        if parent_location:
+            # Check if this would create a circular reference
+            current = parent_location
+            while current:
+                if current.pk == self.instance.pk if self.instance else None:
+                    raise CustomValidationError("Cannot set parent location that creates a circular reference.")
+                current = current.parent_location
+        
+        return attrs
+
+
+class BinSerializer(serializers.ModelSerializer):
+    location_name = serializers.CharField(source='location.name', read_only=True)
+    warehouse_name = serializers.CharField(source='location.warehouse.name', read_only=True)
+    
+    class Meta:
+        model = Bin
+        fields = '__all__'
+    
+    def validate_code(self, value):
+        if not value.strip():
+            raise CustomValidationError("Bin code cannot be empty.")
+        return value
+
+
 class InventorySerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     warehouse_name = serializers.CharField(source='warehouse.name', read_only=True)
+    location_name = serializers.CharField(source='location.name', read_only=True, allow_null=True)
+    bin_name = serializers.CharField(source='bin.name', read_only=True, allow_null=True)
     available_stock = serializers.IntegerField(read_only=True)
     
     class Meta:
@@ -237,6 +283,23 @@ class InventorySerializer(serializers.ModelSerializer):
         if qty_reserved > qty_on_hand:
             raise CustomValidationError({
                 "qty_reserved": "Reserved quantity cannot exceed quantity on hand."
+            })
+        
+        # Validate location/warehouse consistency
+        warehouse = attrs.get('warehouse', self.instance.warehouse if self.instance else None)
+        location = attrs.get('location', self.instance.location if self.instance else None)
+        
+        if location and warehouse and location.warehouse != warehouse:
+            raise CustomValidationError({
+                "location": "Selected location must belong to the selected warehouse."
+            })
+        
+        # Validate bin/location consistency
+        bin = attrs.get('bin', self.instance.bin if self.instance else None)
+        
+        if bin and location and bin.location != location:
+            raise CustomValidationError({
+                "bin": "Selected bin must belong to the selected location."
             })
         
         return attrs
@@ -342,7 +405,11 @@ class TransferLineSerializer(serializers.ModelSerializer):
 class TransferSerializer(serializers.ModelSerializer):
     lines = TransferLineSerializer(many=True)
     from_warehouse_name = serializers.CharField(source='from_warehouse.name', read_only=True)
+    from_location_name = serializers.CharField(source='from_location.name', read_only=True, allow_null=True)
+    from_bin_name = serializers.CharField(source='from_bin.name', read_only=True, allow_null=True)
     to_warehouse_name = serializers.CharField(source='to_warehouse.name', read_only=True)
+    to_location_name = serializers.CharField(source='to_location.name', read_only=True, allow_null=True)
+    to_bin_name = serializers.CharField(source='to_bin.name', read_only=True, allow_null=True)
     requested_by_name = serializers.CharField(source='requested_by.get_full_name', read_only=True)
     approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
     
@@ -353,10 +420,37 @@ class TransferSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         from_warehouse = attrs.get('from_warehouse')
         to_warehouse = attrs.get('to_warehouse')
+        from_location = attrs.get('from_location')
+        to_location = attrs.get('to_location')
+        from_bin = attrs.get('from_bin')
+        to_bin = attrs.get('to_bin')
         
+        # Check if source and destination are the same
         if from_warehouse and to_warehouse and from_warehouse == to_warehouse:
+            if from_location and to_location and from_location == to_location:
+                if from_bin and to_bin and from_bin == to_bin:
+                    raise CustomValidationError({
+                        "to_warehouse": "Source and destination cannot be the same."
+                    })
+        
+        # Validate location/warehouse consistency
+        if from_location and from_warehouse and from_location.warehouse != from_warehouse:
             raise CustomValidationError({
-                "from_warehouse": "Source and destination warehouses cannot be the same."
+                "from_location": "From location must belong to the from warehouse."
+            })
+        if to_location and to_warehouse and to_location.warehouse != to_warehouse:
+            raise CustomValidationError({
+                "to_location": "To location must belong to the to warehouse."
+            })
+        
+        # Validate bin/location consistency
+        if from_bin and from_location and from_bin.location != from_location:
+            raise CustomValidationError({
+                "from_bin": "From bin must belong to the from location."
+            })
+        if to_bin and to_location and to_bin.location != to_location:
+            raise CustomValidationError({
+                "to_bin": "To bin must belong to the to location."
             })
         
         lines_data = attrs.get('lines', [])
@@ -438,6 +532,8 @@ class PromotionSerializer(serializers.ModelSerializer):
 class PurchaseOrderLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     variant_name = serializers.CharField(source='variant.name', read_only=True)
+    destination_location_name = serializers.CharField(source='destination_location.name', read_only=True, allow_null=True)
+    destination_bin_name = serializers.CharField(source='destination_bin.name', read_only=True, allow_null=True)
     
     class Meta:
         model = PurchaseOrderLine
@@ -453,12 +549,26 @@ class PurchaseOrderLineSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise CustomValidationError("Unit cost must be greater than zero.")
         return value
+    
+    def validate(self, attrs):
+        # Validate location/warehouse consistency
+        destination_location = attrs.get('destination_location')
+        destination_bin = attrs.get('destination_bin')
+        
+        if destination_bin and destination_location and destination_bin.location != destination_location:
+            raise CustomValidationError({
+                "destination_bin": "Destination bin must belong to the selected location."
+            })
+        
+        return attrs
 
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):
     lines = PurchaseOrderLineSerializer(many=True)
     supplier_name = serializers.CharField(source='supplier.get_full_name', read_only=True)
     warehouse_name = serializers.CharField(source='warehouse.name', read_only=True)
+    destination_location_name = serializers.CharField(source='destination_location.name', read_only=True, allow_null=True)
+    destination_bin_name = serializers.CharField(source='destination_bin.name', read_only=True, allow_null=True)
     approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
     
     class Meta:
@@ -478,6 +588,21 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if expected_delivery_date and order_date and expected_delivery_date <= order_date:
             raise CustomValidationError({
                 "expected_delivery_date": "Expected delivery date must be after order date."
+            })
+        
+        # Validate location/warehouse consistency
+        warehouse = attrs.get('warehouse')
+        destination_location = attrs.get('destination_location')
+        destination_bin = attrs.get('destination_bin')
+        
+        if destination_location and warehouse and destination_location.warehouse != warehouse:
+            raise CustomValidationError({
+                "destination_location": "Destination location must belong to the selected warehouse."
+            })
+        
+        if destination_bin and destination_location and destination_bin.location != destination_location:
+            raise CustomValidationError({
+                "destination_bin": "Destination bin must belong to the selected location."
             })
         
         return attrs
@@ -520,6 +645,8 @@ class GoodsReceivedNoteLineSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='purchase_order_line.product.name', read_only=True)
     ordered_qty = serializers.IntegerField(source='purchase_order_line.ordered_qty', read_only=True)
     received_so_far = serializers.IntegerField(source='purchase_order_line.received_qty', read_only=True)
+    destination_location_name = serializers.CharField(source='destination_location.name', read_only=True, allow_null=True)
+    destination_bin_name = serializers.CharField(source='destination_bin.name', read_only=True, allow_null=True)
     
     class Meta:
         model = GoodsReceivedNoteLine
@@ -529,6 +656,18 @@ class GoodsReceivedNoteLineSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise CustomValidationError("Received quantity must be greater than zero.")
         return value
+    
+    def validate(self, attrs):
+        # Validate location/warehouse consistency
+        destination_location = attrs.get('destination_location')
+        destination_bin = attrs.get('destination_bin')
+        
+        if destination_bin and destination_location and destination_bin.location != destination_location:
+            raise CustomValidationError({
+                "destination_bin": "Destination bin must belong to the selected location."
+            })
+        
+        return attrs
 
 
 class GoodsReceivedNoteSerializer(serializers.ModelSerializer):
@@ -557,6 +696,59 @@ class GoodsReceivedNoteSerializer(serializers.ModelSerializer):
             GoodsReceivedNoteLine.objects.create(grn=grn, **line_data)
         
         return grn
+
+
+class ReservationLineSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    variant_name = serializers.CharField(source='variant.name', read_only=True)
+
+    class Meta:
+        model = ReservationLine
+        fields = '__all__'
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise CustomValidationError("Quantity must be greater than zero.")
+        return value
+
+class ReservationSerializer(serializers.ModelSerializer):
+    lines = ReservationLineSerializer(many=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True)
+
+    class Meta:
+        model = Reservation
+        fields = '__all__'
+
+    def validate(self, attrs):
+        lines_data = attrs.get('lines', [])
+        if not lines_data:
+            raise CustomValidationError({"lines": "Reservation must have at least one line item."})
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        lines_data = validated_data.pop('lines', [])
+        reservation = Reservation.objects.create(**validated_data)
+
+        for line_data in lines_data:
+            ReservationLine.objects.create(reservation=reservation, **line_data)
+
+        return reservation
+
+    def update(self, instance, validated_data):
+        lines_data = validated_data.pop('lines', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if lines_data is not None:
+            instance.lines.all().delete()
+            for line_data in lines_data:
+                ReservationLine.objects.create(reservation=instance, **line_data)
+
+        return instance
 
 
 class CouponSerializer(serializers.ModelSerializer):
@@ -615,6 +807,81 @@ class ReturnSerializer(serializers.ModelSerializer):
                 ReturnLine.objects.create(return_obj=instance, **line_data)
         
         return instance
+
+
+class WebhookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Webhook
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at', 'last_triggered')
+    
+    def validate_target_url(self, value):
+        """
+        Validate that the target URL is properly formatted
+        """
+        if not value.startswith(('http://', 'https://')):
+            raise CustomValidationError("Target URL must start with http:// or https://")
+        return value
+
+
+class WebhookLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WebhookLog
+        fields = '__all__'
+        read_only_fields = ('timestamp',)
+
+
+class PaymentTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentToken
+        fields = '__all__'
+        read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def validate_token(self, value):
+        """
+        Validate that the token meets basic format requirements
+        """
+        if len(value) < 10:  # Basic validation
+            raise CustomValidationError("Token format is invalid")
+        return value
+
+
+class PaymentGatewayConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentGatewayConfig
+        fields = '__all__'
+        read_only_fields = ('created_at', 'updated_at')
+    
+    def validate_gateway(self, value):
+        """
+        Validate the gateway choice
+        """
+        valid_gateways = [choice[0] for choice in PaymentGatewayConfig.GATEWAY_CHOICES]
+        if value not in valid_gateways:
+            raise CustomValidationError(f"Gateway must be one of: {', '.join(valid_gateways)}")
+        return value
+
+
+class EcommercePlatformSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcommercePlatform
+        fields = '__all__'
+        read_only_fields = ('id', 'last_sync', 'created_at', 'updated_at')
+    
+    def validate_api_url(self, value):
+        """
+        Validate that the API URL is properly formatted
+        """
+        if not value.startswith(('http://', 'https://')):
+            raise CustomValidationError("API URL must start with http:// or https://")
+        return value
+
+
+class EcommerceSyncLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcommerceSyncLog
+        fields = '__all__'
+        read_only_fields = ('id', 'started_at', 'completed_at')
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

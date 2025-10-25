@@ -104,12 +104,20 @@ export const userAPI = {
   updateTransfer: (id: number, transferData: any) => apiClient.put(`/transfers/${id}/`, transferData),
 };
 
-// Product API calls
+// 
 export const productAPI = {
   getProducts: () => apiClient.get('/products/'),
   getProductById: (id: number) => apiClient.get(`/products/${id}/`),
-  createProduct: (productData: any) => apiClient.post('/products/', productData),
-  updateProduct: (id: number, productData: any) => apiClient.put(`/products/${id}/`, productData),
+  createProduct: (productData: FormData) => apiClient.post('/products/', productData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
+  updateProduct: (id: number, productData: FormData) => apiClient.patch(`/products/${id}/`, productData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }),
   deleteProduct: (id: number) => apiClient.delete(`/products/${id}/`),
 };
 
@@ -126,8 +134,10 @@ export const warehouseAPI = {
 export const inventoryAPI = {
   getInventory: () => apiClient.get('/inventory/'),
   getInventoryById: (id: number) => apiClient.get(`/inventory/${id}/`),
-  getLowStockAlerts: () => apiClient.get('/inventory/low-stock/'),
+  createInventory: (inventoryData: any) => apiClient.post('/inventory/', inventoryData),
   updateInventory: (id: number, inventoryData: any) => apiClient.put(`/inventory/${id}/`, inventoryData),
+  deleteInventory: (id: number) => apiClient.delete(`/inventory/${id}/`),
+  getLowStockAlerts: () => apiClient.get('/inventory/low_stock/'),
 };
 
 // Category API calls
@@ -161,6 +171,14 @@ export const saleAPI = {
       responseType: 'blob', // Important: set response type to blob for PDF
     });
   },
+};
+
+export const reservationAPI = {
+  getReservations: () => apiClient.get('/reservations/'),
+  getReservationById: (id: number) => apiClient.get(`/reservations/${id}/`),
+  createReservation: (data: any) => apiClient.post('/reservations/', data),
+  updateReservation: (id: number, data: any) => apiClient.put(`/reservations/${id}/`, data),
+  deleteReservation: (id: number) => apiClient.delete(`/reservations/${id}/`),
 };
 
 // Transfer API calls
@@ -222,6 +240,26 @@ export const couponAPI = {
   updateCoupon: (id: number, couponData: any) => apiClient.put(`/coupons/${id}/`, couponData),
   deleteCoupon: (id: number) => apiClient.delete(`/coupons/${id}/`),
   verifyCoupon: (code: string) => apiClient.get(`/coupons/verify/${code}/`),
+};
+
+// Location API calls
+export const locationAPI = {
+  getLocations: () => apiClient.get('/locations/'),
+  getLocationById: (id: number) => apiClient.get(`/locations/${id}/`),
+  getLocationsByWarehouse: (warehouseId: string) => apiClient.get(`/locations/?warehouse=${warehouseId}`),
+  createLocation: (locationData: any) => apiClient.post('/locations/', locationData),
+  updateLocation: (id: number, locationData: any) => apiClient.put(`/locations/${id}/`, locationData),
+  deleteLocation: (id: number) => apiClient.delete(`/locations/${id}/`),
+};
+
+// Bin API calls
+export const binAPI = {
+  getBins: () => apiClient.get('/bins/'),
+  getBinById: (id: number) => apiClient.get(`/bins/${id}/`),
+  getBinsByLocation: (locationId: string) => apiClient.get(`/bins/?location=${locationId}`),
+  createBin: (binData: any) => apiClient.post('/bins/', binData),
+  updateBin: (id: number, binData: any) => apiClient.put(`/bins/${id}/`, binData),
+  deleteBin: (id: number) => apiClient.delete(`/bins/${id}/`),
 };
 
 export default apiClient;

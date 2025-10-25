@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { customerAPI } from '../services/api';
 import { useAppSelector } from '../hooks/redux';
+import { CustomerPurchaseHistory, SaleItem, Payment, SaleHistory } from '../types';
 import {
   Box,
   Typography,
@@ -20,36 +21,6 @@ import {
   Divider,
 } from '@mui/material';
 import { format } from 'date-fns';
-
-interface CustomerPurchaseHistory {
-  id: number;
-  name: string;
-  email?: string;
-  phone?: string;
-}
-
-interface SaleItem {
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-}
-
-interface Payment {
-  method: string;
-  amount: number;
-  reference?: string;
-}
-
-interface SaleHistory {
-  id: number;
-  receipt_number: string;
-  sale_date: string;
-  total_amount: number;
-  payment_status: string;
-  items: SaleItem[];
-  payments: Payment[];
-}
 
 interface CustomerHistoryProps {
   customerId: number;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../services/api';
 import { useAppSelector } from '../hooks/redux';
+import { exportTableData } from '../utils/exportUtils';
 import {
   Table,
   TableBody,
@@ -14,7 +15,10 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  Button,
+  Grid,
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 
 interface ProfitabilityReportItem {
   id: number;
@@ -33,9 +37,10 @@ interface ProfitabilityReportProps {
     warehouseId: string;
     categoryId: string;
   };
+  canExport: boolean;
 }
 
-const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ filters }) => {
+const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ filters, canExport }) => {
   const [reportData, setReportData] = useState<ProfitabilityReportItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +73,27 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ filters }) =>
     }
   }, [filters, isAuthenticated]);
 
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+    if (!reportData || reportData.length === 0) {
+      setError('No data to export');
+      return;
+    }
+
+    // Prepare data for export (add summary info as needed)
+    const exportData = reportData.map(item => ({
+      'Receipt #': item.receipt_number,
+      'Date': new Date(item.sale_date).toLocaleDateString(),
+      'Revenue': `${item.total_revenue.toFixed(2)}`,
+      'COGS': `${item.total_cogs.toFixed(2)}`,
+      'Profit': `${item.profit.toFixed(2)}`,
+      'Margin %': `${item.profit_margin.toFixed(2)}%`,
+    }));
+
+    // Add summary as additional information
+    const fileName = `profitability-report-${new Date().toISOString().split('T')[0]}.${format}`;
+    exportTableData(exportData, format, fileName, 'Profitability Report');
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="200px">
@@ -83,13 +109,47 @@ const ProfitabilityReport: React.FC<ProfitabilityReportProps> = ({ filters }) =>
   return (
     <Box>
       <Box mb={3}>
-        <Typography variant="h6">Profitability Report Summary</Typography>
+        <Grid container justifyContent="space-between" alignItems="center">
+          <Grid item>
+            <Typography variant="h6">Profitability Report Summary</Typography>
+          </Grid>
+          {canExport && (
+            <Grid item>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('csv')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export CSV
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('excel')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export Excel
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('pdf')}
+                size="small"
+              >
+                Export PDF
+              </Button>
+            </Grid>
+          )}
+        </Grid>
         {summary && (
           <Box display="flex" flexDirection="column" gap={1} mb={2}>
             <Box display="flex" gap={3}>
-              <Chip label={`Total Revenue: $${summary.total_revenue.toFixed(2)}`} variant="outlined" />
-              <Chip label={`Total COGS: $${summary.total_cogs.toFixed(2)}`} variant="outlined" />
-              <Chip label={`Total Profit: $${summary.total_profit.toFixed(2)}`} variant="outlined" />
+              <Chip label={`Total Revenue: ${summary.total_revenue.toFixed(2)}`} variant="outlined" />
+              <Chip label={`Total COGS: ${summary.total_cogs.toFixed(2)}`} variant="outlined" />
+              <Chip label={`Total Profit: ${summary.total_profit.toFixed(2)}`} variant="outlined" />
             </Box>
             <Box>
               <Chip label={`Overall Margin: ${summary.overall_profit_margin.toFixed(2)}%`} variant="outlined" />

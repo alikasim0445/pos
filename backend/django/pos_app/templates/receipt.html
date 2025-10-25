@@ -108,8 +108,8 @@
             <tr>
                 <td>{{ line.product.name }}{% if line.variant %} ({{ line.variant.name }}){% endif %}</td>
                 <td>{{ line.quantity }}</td>
-                <td>${{ line.unit_price }}</td>
-                <td>${{ line.total_price }}</td>
+                <td>${{ line.unit_price|floatformat:2 }}</td>
+                <td>${{ line.total_price|floatformat:2 }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -124,16 +124,23 @@
         <div><strong>Discount:</strong> <span>-${{ sale.discount_amount|floatformat:2 }}</span></div>
         {% endif %}
         <div><strong>Total:</strong> <span>${{ sale.total_amount|floatformat:2 }}</span></div>
+        
         {% for payment in payments %}
-        <div><strong>Payment ({{ payment.payment_method }}):</strong> <span>${{ payment.amount|floatformat:2 }}</span></div>
+        <div><strong>Payment ({{ payment.payment_method|title }}):</strong> <span>${{ payment.amount|floatformat:2 }}</span></div>
         {% endfor %}
+        
         {% if sale.balance_due != 0 %}
         <div><strong>Balance Due:</strong> <span>${{ sale.balance_due|floatformat:2 }}</span></div>
         {% endif %}
     </div>
 
     <div class="payment-info">
-        <p>Payment Method: {% for payment in payments %}{{ payment.payment_method }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+        <p>Payment Method: 
+            {% for payment in payments %}
+                {{ payment.payment_method|title }}
+                {% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </p>
     </div>
 
     <div class="footer">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../services/api';
 import { useAppSelector } from '../hooks/redux';
+import { exportTableData } from '../utils/exportUtils';
 import {
   Table,
   TableBody,
@@ -14,7 +15,10 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  Button,
+  Grid,
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 
 interface SaleReportItem {
   id: number;
@@ -39,9 +43,10 @@ interface SalesReportProps {
     warehouseId: string;
     categoryId: string;
   };
+  canExport: boolean;
 }
 
-const SalesReport: React.FC<SalesReportProps> = ({ filters }) => {
+const SalesReport: React.FC<SalesReportProps> = ({ filters, canExport }) => {
   const [reportData, setReportData] = useState<SaleReportItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +80,27 @@ const SalesReport: React.FC<SalesReportProps> = ({ filters }) => {
     }
   }, [filters, isAuthenticated]);
 
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+    if (!reportData || reportData.length === 0) {
+      setError('No data to export');
+      return;
+    }
+
+    // Prepare data for export (flatten items for each sale)
+    const exportData = reportData.map(sale => ({
+      'Receipt #': sale.receipt_number,
+      'Date': new Date(sale.sale_date).toLocaleDateString(),
+      'Customer': sale.customer_name,
+      'Warehouse': sale.warehouse_name,
+      'Amount': `${sale.total_amount.toFixed(2)}`,
+      'Status': sale.payment_status,
+      'Items': sale.items.map(item => `${item.quantity}x ${item.product_name} (${item.unit_price.toFixed(2)})`).join('; '),
+    }));
+
+    const fileName = `sales-report-${new Date().toISOString().split('T')[0]}.${format}`;
+    exportTableData(exportData, format, fileName, 'Sales Report');
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="200px">
@@ -90,11 +116,45 @@ const SalesReport: React.FC<SalesReportProps> = ({ filters }) => {
   return (
     <Box>
       <Box mb={3}>
-        <Typography variant="h6">Sales Report Summary</Typography>
+        <Grid container justifyContent="space-between" alignItems="center">
+          <Grid item>
+            <Typography variant="h6">Sales Report Summary</Typography>
+          </Grid>
+          {canExport && (
+            <Grid item>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('csv')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export CSV
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('excel')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export Excel
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('pdf')}
+                size="small"
+              >
+                Export PDF
+              </Button>
+            </Grid>
+          )}
+        </Grid>
         {summary && (
           <Box display="flex" gap={3} mb={2}>
             <Chip label={`Total Sales: ${summary.total_sales}`} variant="outlined" />
-            <Chip label={`Total Revenue: $${summary.total_revenue.toFixed(2)}`} variant="outlined" />
+            <Chip label={`Total Revenue: ${summary.total_revenue.toFixed(2)}`} variant="outlined" />
             <Chip label={`Period: ${summary.date_range}`} variant="outlined" />
           </Box>
         )}

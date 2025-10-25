@@ -3,6 +3,8 @@ import { useAppSelector } from '../hooks/redux';
 import { Navigate, useLocation } from 'react-router-dom';
 import { hasRoleLevel } from '../utils/roleUtils';
 
+import { ROLES } from '../constants/roles';
+
 const StoreManagerRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const location = useLocation();
@@ -13,7 +15,7 @@ const StoreManagerRoute: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   // Check if user has store manager or higher role
-  if (!hasRoleLevel(user, 'store_manager')) {
+  if (!hasRoleLevel(user, ROLES.STORE_MANAGER)) {
     // Redirect to dashboard if not authorized
     return <Navigate to="/" replace />;
   }

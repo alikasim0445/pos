@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useAppSelector } from '../hooks/redux';
+import { useAppSelector, useAppDispatch } from '../hooks/redux';
 import { customerAPI } from '../services/api';
+import { Customer } from '../types';
+import CustomerForm from '../components/CustomerForm';
 import {
   CircularProgress,
   Alert,
@@ -13,32 +15,26 @@ import {
   Box,
   Dialog,
   DialogContent,
-  TextField,
-  MenuItem,
+  DialogActions,
+  DialogContentText,
 } from '@mui/material';
-import { Add as AddIcon, History as HistoryIcon } from '@mui/icons-material';
+import { Add as AddIcon, History as HistoryIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import CustomerDetails from '../components/CustomerDetails';
 
-interface Customer {
-  id: number;
-  first_name: string;
-  last_name: string;
-  email?: string;
-  phone?: string;
-  loyalty_points: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 const Customers: React.FC = () => {
+  const dispatch = useAppDispatch();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
@@ -62,11 +58,13 @@ const Customers: React.FC = () => {
 
   const handleCreateCustomer = () => {
     setEditingCustomer(null);
+    setFormError(null);
     setIsFormOpen(true);
   };
 
   const handleEditCustomer = (customer: Customer) => {
     setEditingCustomer(customer);
+    setFormError(null);
     setIsFormOpen(true);
   };
 
@@ -75,15 +73,61 @@ const Customers: React.FC = () => {
     setShowHistory(true);
   };
 
-  const handleFormSubmit = async (customer: Customer) => {
-    if (editingCustomer) {
-      // Update existing customer in the list
-      setCustomers(prev => prev.map(c => c.id === customer.id ? customer : c));
-    } else {
-      // Add new customer to the list
-      setCustomers(prev => [customer, ...prev]);
+  const handleFormSubmit = async (customerData: Customer | Omit<Customer, 'id' | 'created_at' | 'updated_at'>) => {
+    setFormLoading(true);
+    setFormError(null);
+    
+    try {
+      if (editingCustomer && 'id' in customerData && customerData.id) {
+        // Update existing customer
+        const response = await customerAPI.updateCustomer(customerData.id, customerData);
+        setCustomers(prev => prev.map(c => c.id === customerData.id ? response.data : c));
+      } else {
+        // Create new customer - ensure no id field is sent
+        const createPayload = {
+          first_name: customerData.first_name,
+          last_name: customerData.last_name,
+          email: customerData.email || '',
+          phone: customerData.phone || '',
+          loyalty_points: customerData.loyalty_points,
+          is_active: customerData.is_active,
+        };
+        
+        const response = await customerAPI.createCustomer(createPayload);
+        setCustomers(prev => [response.data, ...prev]);
+      }
+      setIsFormOpen(false);
+      setFormError(null);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to save customer');
+    } finally {
+      setFormLoading(false);
     }
-    setIsFormOpen(false);
+  };
+
+  const handleDeleteDialogOpen = (customer: Customer) => {
+    setCustomerToDelete(customer);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false);
+    setCustomerToDelete(null);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    
+    setDeleteLoading(true);
+    try {
+      await customerAPI.deleteCustomer(customerToDelete.id);
+      setCustomers(prev => prev.filter(c => c.id !== customerToDelete.id));
+      handleDeleteDialogClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete customer');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   if (loading) {
@@ -130,14 +174,25 @@ const Customers: React.FC = () => {
                   >
                     View History
                   </Button>
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    size="small"
-                    onClick={() => handleEditCustomer(customer)}
-                  >
-                    Edit
-                  </Button>
+                  <Box>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      onClick={() => handleEditCustomer(customer)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      size="small"
+                      onClick={() => handleDeleteDialogOpen(customer)}
+                      sx={{ ml: 1 }}
+                    >
+                      Delete
+                    </Button>
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
@@ -149,7 +204,7 @@ const Customers: React.FC = () => {
       <Fab 
         color="primary" 
         aria-label="add" 
-        style={{ position: 'fixed', bottom: 16, right: 16 }}
+        style={{ position: 'fixed', bottom: 80, right: 16 }}
         onClick={handleCreateCustomer}
       >
         <AddIcon />
@@ -167,6 +222,45 @@ const Customers: React.FC = () => {
             <CustomerDetails customerId={selectedCustomerId} />
           )}
         </DialogContent>
+      </Dialog>
+      
+      {/* Customer Form Dialog */}
+      <CustomerForm
+        open={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setFormError(null);
+        }}
+        onSubmit={handleFormSubmit}
+        initialData={editingCustomer}
+        loading={formLoading}
+        error={formError}
+      />
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteDialogClose}
+        aria-labelledby="delete-customer-dialog-title"
+        aria-describedby="delete-customer-dialog-description"
+      >
+        <DialogContent>
+          <DialogContentText id="delete-customer-dialog-description">
+            Are you sure you want to delete customer <strong>{customerToDelete?.first_name} {customerToDelete?.last_name}</strong>? 
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteDialogClose} disabled={deleteLoading}>Cancel</Button>
+          <Button 
+            onClick={handleDeleteCustomer} 
+            color="error" 
+            disabled={deleteLoading}
+            variant="contained"
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </div>
   );

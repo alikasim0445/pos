@@ -14,6 +14,8 @@ import {
   InputLabel,
   Select,
 } from '@mui/material';
+import { useAppSelector } from '../hooks/redux';
+import { hasPermission } from '../utils/roleUtils';
 import SalesReport from '../components/SalesReport';
 import InventoryReport from '../components/InventoryReport';
 import ProfitabilityReport from '../components/ProfitabilityReport';
@@ -27,6 +29,7 @@ const Reports: React.FC = () => {
     warehouseId: '',
     categoryId: '',
   });
+  const { user } = useAppSelector((state) => state.auth);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -42,6 +45,9 @@ const Reports: React.FC = () => {
   const applyFilters = () => {
     console.log('Applying filters:', filters);
   };
+
+  // Check if user has export permission
+  const canExport = hasPermission(user, 'export_data');
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -106,6 +112,26 @@ const Reports: React.FC = () => {
                 Apply Filters
               </Button>
             </Grid>
+            {canExport && (
+              <Grid item xs={12} md={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Export</InputLabel>
+                  <Select
+                    value=""
+                    onChange={(e) => {
+                      // This would trigger export for the active report
+                      console.log('Export option selected:', e.target.value);
+                    }}
+                    label="Export"
+                  >
+                    <MenuItem value="">Export As...</MenuItem>
+                    <MenuItem value="csv">CSV</MenuItem>
+                    <MenuItem value="excel">Excel</MenuItem>
+                    <MenuItem value="pdf">PDF</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </CardContent>
       </Card>
@@ -118,10 +144,10 @@ const Reports: React.FC = () => {
       </Tabs>
       
       <Box>
-        {activeTab === 0 && <SalesReport filters={filters} />}
-        {activeTab === 1 && <InventoryReport filters={filters} />}
-        {activeTab === 2 && <ProfitabilityReport filters={filters} />}
-        {activeTab === 3 && <TransferReport filters={filters} />}
+        {activeTab === 0 && <SalesReport filters={filters} canExport={canExport} />}
+        {activeTab === 1 && <InventoryReport filters={filters} canExport={canExport} />}
+        {activeTab === 2 && <ProfitabilityReport filters={filters} canExport={canExport} />}
+        {activeTab === 3 && <TransferReport filters={filters} canExport={canExport} />}
       </Box>
     </div>
   );

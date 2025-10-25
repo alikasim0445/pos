@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Container,
   Box,
-  Paper,
   Avatar,
   Typography,
   TextField,
@@ -13,12 +12,17 @@ import {
   Checkbox,
   CircularProgress,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { login } from '../store/authSlice';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import PasswordInput from './PasswordInput';
+import apiClient from '../services/api';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState(() => {
@@ -33,8 +37,16 @@ const Login: React.FC = () => {
     // Check if remember me was previously selected
     return localStorage.getItem('rememberMe') === 'true';
   });
+  const [showMfaDialog, setShowMfaDialog] = useState(false);
+  const [mfaToken, setMfaToken] = useState('');
+  const [mfaError, setMfaError] = useState('');
+  const [isVerifyingMfa, setIsVerifyingMfa] = useState(false);
+  const [loginRequiresMfa, setLoginRequiresMfa] = useState(false);
+  const [tempUserDetails, setTempUserDetails] = useState({ userId: 0, username: '', email: '' });
+  
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoading, error } = useAppSelector((state) => state.auth);
 
   // Helper function to format error messages
@@ -55,42 +67,114 @@ const Login: React.FC = () => {
     return 'An error occurred';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      const result = await dispatch(login({ email, password })).unwrap();
-
-      // Send token to service worker
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'SET_AUTH_TOKEN',
-          token: result.token,
+      const loginResult = await apiClient.post('/token/', { username: email, password });
+      
+      if (loginResult.data.requires_mfa) {
+        // MFA is required
+        setTempUserDetails({
+          userId: loginResult.data.user_id,
+          username: loginResult.data.username,
+          email: loginResult.data.email,
         });
-      }
-      
-      // Handle "Remember Me" functionality
-      if (rememberMe) {
-        // Save credentials to localStorage
-        localStorage.setItem('rememberedEmail', email);
-        localStorage.setItem('rememberedPassword', password);
-        localStorage.setItem('rememberMe', 'true');
+        setLoginRequiresMfa(true);
+        setShowMfaDialog(true);
       } else {
-        // Clear saved credentials if remember me is not checked
-        localStorage.removeItem('rememberedEmail');
-        localStorage.removeItem('rememberedPassword');
-        localStorage.removeItem('rememberMe');
+        // Direct login (no MFA required)
+        const result = await dispatch(login({ email, password })).unwrap();
+
+        // Send token to service worker
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_AUTH_TOKEN',
+            token: result.token,
+          });
+        }
+        
+        // Handle "Remember Me" functionality
+        if (rememberMe) {
+          // Save credentials to localStorage
+          localStorage.setItem('rememberedEmail', email);
+          localStorage.setItem('rememberedPassword', password);
+          localStorage.setItem('rememberMe', 'true');
+        } else {
+          // Clear saved credentials if remember me is not checked
+          localStorage.removeItem('rememberedEmail');
+          localStorage.removeItem('rememberedPassword');
+          localStorage.removeItem('rememberMe');
+        }
+        
+        // Redirect to dashboard on successful login
+        navigate(location.state?.from?.pathname || '/');
       }
-      
-      // Redirect to dashboard on successful login
-      navigate('/');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login failed:', err);
       // In case of error, clear saved credentials
       localStorage.removeItem('rememberedEmail');
       localStorage.removeItem('rememberedPassword');
       localStorage.removeItem('rememberMe');
     }
+  };
+
+  const handleMfaSubmit = async () => {
+    setIsVerifyingMfa(true);
+    setMfaError('');
+    
+    try {
+      // Verify the MFA token
+      const response = await apiClient.post('/mfa/verify/', {
+        username: email, // using the email/username that was used for initial login
+        token: mfaToken,
+      });
+
+      if (response.data.valid) {
+        // If MFA is valid, now perform the actual login with email and password to get tokens
+        const loginResult = await dispatch(login({ email, password })).unwrap();
+
+        // Send token to service worker
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SET_AUTH_TOKEN',
+            token: loginResult.token,
+          });
+        }
+
+        // Handle "Remember Me" functionality
+        if (rememberMe) {
+          // Save credentials to localStorage
+          localStorage.setItem('rememberedEmail', email);
+          localStorage.setItem('rememberedPassword', password);
+          localStorage.setItem('rememberMe', 'true');
+        } else {
+          // Clear saved credentials if remember me is not checked
+          localStorage.removeItem('rememberedEmail');
+          localStorage.removeItem('rememberedPassword');
+          localStorage.removeItem('rememberMe');
+        }
+        
+        setShowMfaDialog(false);
+        setMfaToken('');
+        
+        // Redirect to dashboard on successful login
+        navigate(location.state?.from?.pathname || '/');
+      } else {
+        setMfaError('Invalid MFA token. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('MFA verification failed:', err);
+      setMfaError(err.response?.data?.error || 'MFA verification failed. Please try again.');
+    } finally {
+      setIsVerifyingMfa(false);
+    }
+  };
+
+  const handleMfaCancel = () => {
+    setShowMfaDialog(false);
+    setMfaToken('');
+    setMfaError('');
   };
 
   return (
@@ -109,8 +193,8 @@ const Login: React.FC = () => {
         <Typography component="h1" variant="h5">
           Sign in
         </Typography>
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-          {error && (
+        <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
+          {error && !loginRequiresMfa && (
             <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
               {formatError(error)}
             </Alert>
@@ -120,20 +204,20 @@ const Login: React.FC = () => {
             required
             fullWidth
             id="email"
-            label="Email Address"
+            label="Email Address or Username"
             name="email"
             autoComplete="email"
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifyingMfa}
           />
           <PasswordInput
             label="Password"
             name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isVerifyingMfa}
           />
           <FormControlLabel
             control={
@@ -142,7 +226,7 @@ const Login: React.FC = () => {
                 color="primary" 
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isLoading}
+                disabled={isLoading || isVerifyingMfa}
               />
             }
             label="Remember me"
@@ -152,7 +236,7 @@ const Login: React.FC = () => {
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
-            disabled={isLoading}
+            disabled={isLoading || isVerifyingMfa}
             startIcon={isLoading && <CircularProgress size={20} />}
           >
             {isLoading ? 'Signing In...' : 'Sign In'}
@@ -171,6 +255,50 @@ const Login: React.FC = () => {
           </Grid>
         </Box>
       </Box>
+      
+      {/* MFA Dialog */}
+      <Dialog open={showMfaDialog} onClose={handleMfaCancel} maxWidth="sm" fullWidth>
+        <DialogTitle>Two-Factor Authentication</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mt: 2, mb: 2 }}>
+            Please enter your authentication code from your authenticator app.
+          </Typography>
+          
+          {mfaError && (
+            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
+              {mfaError}
+            </Alert>
+          )}
+          
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Authentication Code"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={mfaToken}
+            onChange={(e) => setMfaToken(e.target.value.replace(/\s/g, ''))}
+            inputProps={{ maxLength: 6 }}
+            disabled={isVerifyingMfa}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleMfaCancel} disabled={isVerifyingMfa}>Cancel</Button>
+          <Button 
+            onClick={handleMfaSubmit} 
+            variant="contained" 
+            disabled={isVerifyingMfa || mfaToken.length < 6}
+          >
+            {isVerifyingMfa ? (
+              <>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Verifying...
+              </>
+            ) : 'Verify'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

@@ -1,0 +1,103 @@
+export const ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  ADMIN: 'admin',
+  STORE_MANAGER: 'store_manager',
+  WAREHOUSE_MANAGER: 'warehouse_manager',
+  ACCOUNTANT: 'accountant',
+  CASHIER: 'cashier',
+} as const;
+
+export type Role = typeof ROLES[keyof typeof ROLES];
+
+export const ROLE_HIERARCHY: Record<Role, number> = {
+  [ROLES.SUPER_ADMIN]: 5,
+  [ROLES.ADMIN]: 4,
+  [ROLES.STORE_MANAGER]: 3,
+  [ROLES.WAREHOUSE_MANAGER]: 2,
+  [ROLES.ACCOUNTANT]: 1,
+  [ROLES.CASHIER]: 0,
+};
+
+export const PERMISSIONS = {
+  // User Management
+  CREATE_USER: 'create_user',
+  EDIT_USER: 'edit_user',
+  VIEW_USER: 'view_user',
+  ASSIGN_ROLES: 'assign_roles',
+
+  // Product Management
+  ADD_PRODUCT: 'add_product',
+  CHANGE_PRODUCT: 'change_product',
+  VIEW_PRODUCT: 'view_product',
+
+  // Inventory Management
+  MANAGE_INVENTORY: 'manage_inventory',
+  VIEW_INVENTORY: 'view_inventory',
+
+  // Sales and Reporting
+  PROCESS_SALES: 'process_sales',
+  VIEW_SALES: 'view_sales',
+  VIEW_ALL_REPORTS: 'view_all_reports',
+  EXPORT_DATA: 'export_data',
+
+  // Warehouse Management
+  PROCESS_TRANSFERS: 'process_transfers',
+  APPROVE_TRANSFERS: 'approve_transfers',
+
+  // Settings
+  MANAGE_SETTINGS: 'manage_settings',
+} as const;
+
+export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
+
+export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  [ROLES.SUPER_ADMIN]: Object.values(PERMISSIONS),
+  [ROLES.ADMIN]: [
+    PERMISSIONS.CREATE_USER,
+    PERMISSIONS.EDIT_USER,
+    PERMISSIONS.VIEW_USER,
+    PERMISSIONS.ASSIGN_ROLES,
+    PERMISSIONS.ADD_PRODUCT,
+    PERMISSIONS.CHANGE_PRODUCT,
+    PERMISSIONS.VIEW_PRODUCT,
+    PERMISSIONS.MANAGE_INVENTORY,
+    PERMISSIONS.VIEW_INVENTORY,
+    PERMISSIONS.PROCESS_SALES,
+    PERMISSIONS.VIEW_SALES,
+    PERMISSIONS.VIEW_ALL_REPORTS,
+    PERMISSIONS.EXPORT_DATA,
+    PERMISSIONS.PROCESS_TRANSFERS,
+    PERMISSIONS.APPROVE_TRANSFERS,
+    PERMISSIONS.MANAGE_SETTINGS,
+  ],
+  [ROLES.STORE_MANAGER]: [
+    PERMISSIONS.VIEW_SALES,
+    PERMISSIONS.PROCESS_SALES,
+    PERMISSIONS.VIEW_INVENTORY,
+    PERMISSIONS.APPROVE_TRANSFERS,
+    PERMISSIONS.VIEW_ALL_REPORTS, // Store-level reports
+    PERMISSIONS.ADD_PRODUCT,
+    PERMISSIONS.VIEW_PRODUCT,
+    PERMISSIONS.MANAGE_INVENTORY,
+    PERMISSIONS.PROCESS_TRANSFERS,
+    PERMISSIONS.EXPORT_DATA,
+  ],
+  [ROLES.WAREHOUSE_MANAGER]: [
+    PERMISSIONS.VIEW_INVENTORY,
+    PERMISSIONS.MANAGE_INVENTORY,
+    PERMISSIONS.PROCESS_TRANSFERS,
+    PERMISSIONS.VIEW_ALL_REPORTS, // Warehouse-level reports
+    PERMISSIONS.EXPORT_DATA,
+  ],
+  [ROLES.CASHIER]: [
+    PERMISSIONS.PROCESS_SALES,
+    PERMISSIONS.VIEW_PRODUCT,
+    PERMISSIONS.VIEW_INVENTORY,
+  ],
+  [ROLES.ACCOUNTANT]: [
+    PERMISSIONS.VIEW_SALES,
+    PERMISSIONS.VIEW_INVENTORY,
+    PERMISSIONS.VIEW_ALL_REPORTS, // Financial reports
+    PERMISSIONS.EXPORT_DATA,
+  ],
+};

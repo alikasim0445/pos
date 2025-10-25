@@ -28,9 +28,10 @@ if DEBUG:
 
 # Additional CORS settings
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Set to True only in development if needed
+CORS_ALLOW_ALL_ORIGINS = True  # Set to True only in development if needed
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +40,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'channels',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',
     'pos_app',
 ]
 
@@ -51,6 +56,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'pos_app.middleware.TokenBlacklistMiddleware',  # Add token blacklist middleware
+    'pos_app.audit_middleware.AuditMiddleware',  # Add audit middleware
+    'pos_app.audit_middleware.StockChangeMiddleware',  # Add stock change middleware
 ]
 
 ROOT_URLCONF = 'pos_project.urls'
@@ -74,6 +82,19 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'pos_project.wsgi.application'
+ASGI_APPLICATION = 'pos_project.asgi.application'
+
+# Channels layer configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',  # Use Redis in production
+        # For production, use Redis:
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     "hosts": [('127.0.0.1', 6379)],
+        # },
+    },
+}
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -146,3 +167,37 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'lemesakasim32@gmail.com'
 EMAIL_HOST_PASSWORD = 'nvcs uhwz fxsn hqrm'
+
+# Inventory Transfer Settings
+AUTO_RESERVE_TRANSFER_STOCK = True  # Set to True to automatically reserve stock when a transfer is requested
+
+# Sale Reservation Settings
+AUTO_RESERVE_SALE_STOCK = True  # Set to True to automatically reserve stock when a sale is created with pending status
+
+# POS Sales Flow Settings
+DEFAULT_TAX_RATE = 0.10  # Default tax rate of 10%
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}
+
+# Media files (for user-uploaded content like product images)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

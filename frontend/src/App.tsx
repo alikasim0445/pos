@@ -2,10 +2,12 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { restoreAuthState } from './store/authSlice';
+import realTimeSyncService from './services/realTimeSyncService';
 import Dashboard from './pages/Dashboard';
 import Sales from './pages/Sales';
 import Products from './pages/Products';
 import Warehouses from './pages/Warehouses';
+import Inventory from './pages/Inventory';
 import Customers from './pages/Customers';
 import Reports from './pages/Reports';
 import Promotions from './pages/Promotions';
@@ -13,14 +15,15 @@ import PurchaseOrders from './pages/PurchaseOrders';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import StoreManagerDashboard from './pages/StoreManagerDashboard';
+import AccountantDashboard from './pages/AccountantDashboard';
+import Transfer from './pages/TransferRequests';
 import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import SuperAdminRoute from './components/SuperAdminRoute';
-import StoreManagerRoute from './components/StoreManagerRoute';
+import Reservations from './pages/Reservations';
 
 const App: React.FC = () => {
   const dispatch = useDispatch();
@@ -28,6 +31,14 @@ const App: React.FC = () => {
   useEffect(() => {
     // Restore authentication state on app load
     dispatch(restoreAuthState());
+    
+    // Connect to real-time sync service
+    realTimeSyncService.connect();
+    
+    // Cleanup on unmount
+    return () => {
+      realTimeSyncService.disconnect();
+    };
   }, [dispatch]);
 
   return (
@@ -43,31 +54,31 @@ const App: React.FC = () => {
         <Route 
           path="/" 
           element={
-            
+            <ProtectedRoute>
               <AppLayout>
                 <Dashboard />
               </AppLayout>
-            
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/sales" 
           element={
-            
+            <ProtectedRoute>
               <AppLayout>
                 <Sales />
               </AppLayout>
-            
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/products" 
           element={
-            
+            <ProtectedRoute>
               <AppLayout>
                 <Products />
               </AppLayout>
-           
+            </ProtectedRoute>
           } 
         />
         <Route 
@@ -76,6 +87,36 @@ const App: React.FC = () => {
             <ProtectedRoute>
               <AppLayout>
                 <Warehouses />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/inventory" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Inventory />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/transfer" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Transfer />
+              </AppLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/reservations" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Reservations />
               </AppLayout>
             </ProtectedRoute>
           } 
@@ -133,21 +174,31 @@ const App: React.FC = () => {
         <Route 
           path="/users" 
           element={
-            
+            <ProtectedRoute>
               <AppLayout>
                 <Users />
               </AppLayout>
-            
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/store-manager" 
           element={
-            <StoreManagerRoute>
+            <ProtectedRoute>
               <AppLayout>
                 <StoreManagerDashboard />
               </AppLayout>
-            </StoreManagerRoute>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/accountant" 
+          element={
+            <ProtectedRoute>
+              <AppLayout>
+                <AccountantDashboard /> 
+              </AppLayout>
+            </ProtectedRoute>
           } 
         />
         

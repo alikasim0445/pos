@@ -62,6 +62,12 @@ export const userManagementService = {
     return response.data;
   },
 
+  // Reset user MFA
+  resetUserMfa: async (userId: number): Promise<any> => {
+    const response = await apiClient.post(`/super-admin/users/${userId}/mfa/reset/`, {});
+    return response.data;
+  },
+
   // Get user management dashboard data
   getUserManagementDashboard: async (): Promise<any> => {
     const response = await apiClient.get('/user-management-dashboard/');

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useAppSelector } from '../hooks/redux';
+import { useAppSelector, useAppDispatch } from '../hooks/redux';
 import { warehouseAPI } from '../services/api';
+import { setWarehouses, addWarehouse, updateWarehouse, deleteWarehouse, setLoading, setError } from '../store/warehousesSlice';
+import realTimeSyncService from '../services/realTimeSyncService';
 import WarehouseForm from '../components/WarehouseForm';
 import {
   CircularProgress,
@@ -11,35 +13,54 @@ import {
   Typography,
   Grid,
   IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Button,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
 const Warehouses: React.FC = () => {
-    const [warehouses, setWarehouses] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const dispatch = useAppDispatch();
+    const { warehouses, loading, error } = useAppSelector((state) => state.warehouses);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingWarehouse, setEditingWarehouse] = useState<any>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [warehouseToDelete, setWarehouseToDelete] = useState<{id: number, name: string} | null>(null);
     const { isAuthenticated } = useAppSelector((state) => state.auth);
 
     useEffect(() => {
         const fetchWarehouses = async () => {
+            dispatch(setLoading(true));
+            dispatch(setError(null));
+            
             try {
-                setLoading(true);
-                setError(null);
                 const response = await warehouseAPI.getWarehouses();
-                setWarehouses(response.data);
+                dispatch(setWarehouses(response.data));
             } catch (err: any) {
-                setError(err.message || 'Failed to load warehouses');
+                dispatch(setError(err.message || 'Failed to load warehouses'));
             } finally {
-                setLoading(false);
+                dispatch(setLoading(false));
             }
         };
 
         if (isAuthenticated) {
             fetchWarehouses();
         }
-    }, [isAuthenticated, isFormOpen]); // Add isFormOpen to refresh when form closes
+    }, [isAuthenticated, dispatch]);
+
+    // Initialize and connect to real-time sync
+    useEffect(() => {
+        if (isAuthenticated) {
+            realTimeSyncService.connect();
+        }
+
+        return () => {
+            realTimeSyncService.disconnect();
+        };
+    }, [isAuthenticated]);
 
     const handleCreateWarehouse = () => {
         setEditingWarehouse(null);
@@ -53,12 +74,36 @@ const Warehouses: React.FC = () => {
 
     const handleFormSubmit = (warehouse: any) => {
         if (editingWarehouse) {
-            // Update existing warehouse in the list
-            setWarehouses(prev => prev.map(w => w.id === warehouse.id ? warehouse : w));
+            // Update existing warehouse
+            dispatch(updateWarehouse(warehouse));
+            realTimeSyncService.sendWarehouseUpdate('update', warehouse);
         } else {
-            // Add new warehouse to the list
-            setWarehouses(prev => [warehouse, ...prev]);
+            // Add new warehouse to local state first for immediate UI update
+            // Then send to WebSocket to sync with other clients
+            dispatch(addWarehouse(warehouse));
+            realTimeSyncService.sendWarehouseUpdate('create', warehouse);
         }
+        
+        setIsFormOpen(false);
+    };
+
+    const handleDeleteClick = (warehouse: any) => {
+        setWarehouseToDelete({id: warehouse.id, name: warehouse.name});
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        if (warehouseToDelete) {
+            dispatch(deleteWarehouse(warehouseToDelete.id));
+            realTimeSyncService.sendWarehouseUpdate('delete', { id: warehouseToDelete.id });
+            setDeleteDialogOpen(false);
+            setWarehouseToDelete(null);
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteDialogOpen(false);
+        setWarehouseToDelete(null);
     };
 
     if (loading) {
@@ -82,7 +127,7 @@ const Warehouses: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Warehouses</h1>
             <Grid container spacing={3}>
                 {warehouses.map((warehouse: any) => (
-                    <Grid item xs={12} sm={6} md={4} key={warehouse.id}>
+                    <Grid xs={12} sm={6} md={4} key={warehouse.id}>
                         <Card>
                             <CardContent>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -102,12 +147,22 @@ const Warehouses: React.FC = () => {
                                             </Typography>
                                         )}
                                     </div>
-                                    <IconButton 
-                                        size="small" 
-                                        onClick={() => handleEditWarehouse(warehouse)}
-                                    >
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
+                                    <div>
+                                        <IconButton 
+                                            size="small" 
+                                            onClick={() => handleEditWarehouse(warehouse)}
+                                            color="primary"
+                                        >
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                        <IconButton 
+                                            size="small" 
+                                            onClick={() => handleDeleteClick(warehouse)}
+                                            color="error"
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -132,6 +187,31 @@ const Warehouses: React.FC = () => {
                 onSubmit={handleFormSubmit}
                 initialData={editingWarehouse}
             />
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={handleDeleteCancel}
+                aria-labelledby="delete-warehouse-dialog-title"
+                aria-describedby="delete-warehouse-dialog-description"
+            >
+                <DialogTitle id="delete-warehouse-dialog-title">
+                    {"Confirm Delete"}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="delete-warehouse-dialog-description">
+                        {warehouseToDelete && (
+                            `Are you sure you want to delete the warehouse "${warehouseToDelete.name}"? This action cannot be undone.`
+                        )}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleDeleteCancel}>Cancel</Button>
+                    <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };

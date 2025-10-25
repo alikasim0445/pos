@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../services/api';
 import { useAppSelector } from '../hooks/redux';
+import { exportTableData } from '../utils/exportUtils';
 import {
   Table,
   TableBody,
@@ -14,7 +15,10 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  Button,
+  Grid,
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 
 interface TransferReportItem {
   id: number;
@@ -41,9 +45,10 @@ interface TransferReportProps {
     warehouseId: string;
     categoryId: string;
   };
+  canExport: boolean;
 }
 
-const TransferReport: React.FC<TransferReportProps> = ({ filters }) => {
+const TransferReport: React.FC<TransferReportProps> = ({ filters, canExport }) => {
   const [reportData, setReportData] = useState<TransferReportItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +81,27 @@ const TransferReport: React.FC<TransferReportProps> = ({ filters }) => {
     }
   }, [filters, isAuthenticated]);
 
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+    if (!reportData || reportData.length === 0) {
+      setError('No data to export');
+      return;
+    }
+
+    // Prepare data for export (flatten items for each transfer)
+    const exportData = reportData.map(transfer => ({
+      'Transfer #': transfer.transfer_number,
+      'From': transfer.from_warehouse,
+      'To': transfer.to_warehouse,
+      'Status': transfer.status,
+      'Date': new Date(transfer.requested_at).toLocaleDateString(),
+      'Items': transfer.items.map(item => `${item.requested_qty}x ${item.product_name}`).join('; '),
+      'Notes': transfer.notes,
+    }));
+
+    const fileName = `transfer-report-${new Date().toISOString().split('T')[0]}.${format}`;
+    exportTableData(exportData, format, fileName, 'Transfer Report');
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="200px">
@@ -91,7 +117,41 @@ const TransferReport: React.FC<TransferReportProps> = ({ filters }) => {
   return (
     <Box>
       <Box mb={3}>
-        <Typography variant="h6">Transfer Report Summary</Typography>
+        <Grid container justifyContent="space-between" alignItems="center">
+          <Grid item>
+            <Typography variant="h6">Transfer Report Summary</Typography>
+          </Grid>
+          {canExport && (
+            <Grid item>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('csv')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export CSV
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('excel')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export Excel
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('pdf')}
+                size="small"
+              >
+                Export PDF
+              </Button>
+            </Grid>
+          )}
+        </Grid>
         {summary && (
           <Box display="flex" gap={3} mb={2}>
             <Chip label={`Total Transfers: ${summary.total_transfers}`} variant="outlined" />

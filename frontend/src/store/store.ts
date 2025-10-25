@@ -1,9 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './authSlice';
+import productsReducer from './productsSlice';
+import salesReducer from './salesSlice';
+import inventoryReducer from './inventorySlice';
+import warehousesReducer from './warehousesSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    products: productsReducer,
+    sales: salesReducer,
+    inventory: inventoryReducer,
+    warehouses: warehousesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

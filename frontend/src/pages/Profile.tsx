@@ -23,6 +23,7 @@ import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/i
 import { userManagementService } from '../services/userManagementService';
 import { isSuperAdmin } from '../utils/roleUtils';
 import { updateUserInStore } from '../store/authSlice';
+import MfaSettings from '../components/MfaSettings';
 
 // Define the updateUserProfile action in the authSlice (we'll add this to the slice)
 // For now, we'll implement the functionality in this component
@@ -253,6 +254,11 @@ const Profile: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
+          
+          {/* MFA Settings */}
+          {user?.profile?.role && (
+            <MfaSettings userRole={user.profile.role} className="mt-6" />
+          )}
         </Grid>
         
         {/* Profile Main Content */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../services/api';
 import { useAppSelector } from '../hooks/redux';
+import { exportTableData } from '../utils/exportUtils';
 import {
   Table,
   TableBody,
@@ -14,7 +15,10 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  Button,
+  Grid,
 } from '@mui/material';
+import { Download as DownloadIcon } from '@mui/icons-material';
 
 interface InventoryReportItem {
   id: number;
@@ -39,9 +43,10 @@ interface InventoryReportProps {
     warehouseId: string;
     categoryId: string;
   };
+  canExport: boolean;
 }
 
-const InventoryReport: React.FC<InventoryReportProps> = ({ filters }) => {
+const InventoryReport: React.FC<InventoryReportProps> = ({ filters, canExport }) => {
   const [reportData, setReportData] = useState<InventoryReportItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -74,6 +79,31 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ filters }) => {
     }
   }, [filters, isAuthenticated]);
 
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+    if (!reportData || reportData.length === 0) {
+      setError('No data to export');
+      return;
+    }
+
+    // Prepare data for export
+    const exportData = reportData.map(item => ({
+      'Product': item.product_name,
+      'SKU': item.product_sku,
+      'Category': item.category_name,
+      'Warehouse': item.warehouse_name,
+      'On Hand': item.quantity_on_hand,
+      'Reserved': item.quantity_reserved,
+      'Available': item.available_stock,
+      'Min Level': item.min_stock_level,
+      'Unit Price': `${item.unit_price.toFixed(2)}`,
+      'Total Value': `${item.total_value.toFixed(2)}`,
+      'Status': item.is_low_stock ? 'Low Stock' : 'In Stock',
+    }));
+
+    const fileName = `inventory-report-${new Date().toISOString().split('T')[0]}.${format}`;
+    exportTableData(exportData, format, fileName, 'Inventory Report');
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="200px">
@@ -89,11 +119,45 @@ const InventoryReport: React.FC<InventoryReportProps> = ({ filters }) => {
   return (
     <Box>
       <Box mb={3}>
-        <Typography variant="h6">Inventory Report Summary</Typography>
+        <Grid container justifyContent="space-between" alignItems="center">
+          <Grid item>
+            <Typography variant="h6">Inventory Report Summary</Typography>
+          </Grid>
+          {canExport && (
+            <Grid item>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('csv')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export CSV
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('excel')}
+                size="small"
+                sx={{ mr: 1 }}
+              >
+                Export Excel
+              </Button>
+              <Button 
+                variant="outlined" 
+                startIcon={<DownloadIcon />}
+                onClick={() => handleExport('pdf')}
+                size="small"
+              >
+                Export PDF
+              </Button>
+            </Grid>
+          )}
+        </Grid>
         {summary && (
           <Box display="flex" gap={3} mb={2}>
             <Chip label={`Total Items: ${summary.total_items}`} variant="outlined" />
-            <Chip label={`Total Value: $${summary.total_value.toFixed(2)}`} variant="outlined" />
+            <Chip label={`Total Value: ${summary.total_value.toFixed(2)}`} variant="outlined" />
           </Box>
         )}
       </Box>
